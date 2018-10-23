@@ -47,6 +47,7 @@
 #include <stdio.h>
 
 #include "anet.h"
+#include "acl.h"
 
 static void anetSetError(char *err, const char *fmt, ...)
 {
@@ -540,6 +541,19 @@ static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *l
                 return ANET_ERR;
             }
         }
+
+        if (ACL_ENABLE) {
+            char peerip[40];
+            int peerport;
+            int ret = anetPeerToString(fd, peerip, 40, &peerport);
+
+            if ( 0 == ret && !acl_check(peerip) ) {
+                printf("[%d]                     # WARNING: Deny illegal access from %s\n", (int)getpid(), peerip);
+                close(fd);
+                fd = -1;
+            }
+        }
+
         break;
     }
     return fd;

@@ -30,6 +30,7 @@
 
 #include "server.h"
 #include "cluster.h"
+#include "acl.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -308,6 +309,8 @@ void loadServerConfigFromString(char *config) {
             }
         } else if (!strcasecmp(argv[0],"include") && argc == 2) {
             loadServerConfig(argv[1],NULL);
+        } else if (!strcasecmp(argv[0], "aclfile") && argc == 2) { 
+            loadAclFile(argv[1]);
         } else if (!strcasecmp(argv[0],"maxclients") && argc == 2) {
             server.maxclients = atoi(argv[1]);
             if (server.maxclients < 1) {
@@ -798,6 +801,35 @@ void loadServerConfig(char *filename, char *options) {
     }
     loadServerConfigFromString(config);
     sdsfree(config);
+}
+
+void loadAclFile(char *filename) {
+    ACL_ENABLE = 1;
+    serverLog(LL_NOTICE, "+---------------------- NOTICE -----------------------+");
+    serverLog(LL_NOTICE, " access control file: %s", filename);
+    serverLog(LL_NOTICE, "+-----------------------------------------------------+");
+   
+    FILE *handle;
+    char line[1025];
+
+    if ( NULL == (handle = fopen(filename, "r")) ) {
+        serverLog(LL_NOTICE, "Fatal error, can't open accecc control file '%s'", filename);
+        exit(1);
+    }
+
+    while (fgets(line, sizeof line, handle)) {
+        trim(line);
+        if ('#' == line[0]) continue;
+        serverLog(LL_NOTICE, " %s", line);
+        struct acl_node node = parse_acl_node(line);
+        ACL_NODES[ACL_NODES_TAIL++] = node;
+    }
+
+    fclose(handle);
+
+    serverLog(LL_NOTICE, "+-----------------------------------------------------+");
+    //disploy_acl_nodes();
+    //redisLog(REDIS_NOTICE, "+-----------------------------------------------------+");
 }
 
 /*-----------------------------------------------------------------------------
